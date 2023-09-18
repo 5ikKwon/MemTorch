@@ -5,3 +5,4 @@ from .Memristor import *
 from .Stanford_PKU import *
 from .VTEAM import *
 from .window import *
+from .CBRAM import *

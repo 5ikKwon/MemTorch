@@ -65,7 +65,7 @@ class CBRAM(Memristor):
     def __init__(
         self,
         time_series_resolution=1e-6,
-        L = 50,
+        L = 50e-9,
         v_h = 0.35,
         v_r = 700,
         E_a = 0.5,
@@ -82,7 +82,7 @@ class CBRAM(Memristor):
 
         args = memtorch.bh.unpack_parameters(locals())
         super(CBRAM, self).__init__(
-           args.time_series_resolution
+            args.time_series_resolution
         )
         self.L = args.L
         self.v_h = args.v_h
@@ -96,7 +96,7 @@ class CBRAM(Memristor):
         self.alpha = args.alpha
         self.C = args.C
         self.I_comp = args.I_comp
-        self.g = args.g
+        self.g = 0
         self.kT = 0.025
         self.q = 1.602e-19
         self.h = 0
@@ -140,7 +140,7 @@ class CBRAM(Memristor):
         return self.v_r*np.exp(-self.E_a/(self.T*self.kT/300))*np.sinh(self.beta*voltage/(self.T*self.kT/300))
     
     def current(self, voltage):
-        if(self.istouched):
+        if(~self.istouched):
             R_off = (self.rho_on*self.h+self.rho_off*(self.L-self.h))/self.A
             return voltage/R_off
         else:
@@ -161,12 +161,12 @@ class CBRAM(Memristor):
 
         np.seterr(all="raise")
         for t in range(0, len_voltage_signal):
-            if(np.max(voltage_signal) == voltage_signal[t] | np.min(voltage_signal) == voltage_signal[t]):
+            if(np.max(voltage_signal) == voltage_signal[t] or np.min(voltage_signal) == voltage_signal[t]):
                 self.flag = ~self.flag
 
             if (self.flag):
                 if(~self.istouched):
-                    self.h = self.h + (self.dhdt(voltage_signal[t]).self.time_series_resolution)
+                    self.h = self.h + (self.dhdt(voltage_signal[t])*self.time_series_resolution)
                     if (self.h>=self.L):
                         self.h = self.L
                         self.istouched = True
@@ -198,7 +198,10 @@ class CBRAM(Memristor):
             return current    
 ####
 
-
+    def set_conductance(self, conductance):
+        conductance = clip(conductance, 1 / self.r_off, 1 / self.r_on)
+        self.x = self.d * ((1 / conductance) - self.r_on) / (self.r_off - self.r_on)
+        self.g = conductance
 
     def plot_hysteresis_loop(
         self,

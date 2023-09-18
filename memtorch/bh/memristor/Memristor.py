@@ -27,11 +27,11 @@ class Memristor(ABC):
 
     def __init__(
         self,
-        r_off,
-        r_on,
         time_series_resolution,
         pos_write_threshold=0,
         neg_write_threshold=0,
+        r_on=0,
+        r_off=0,
     ):
         self.r_off = r_off
         self.r_on = r_on
