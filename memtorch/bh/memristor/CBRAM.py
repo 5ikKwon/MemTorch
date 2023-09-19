@@ -40,7 +40,7 @@ class CBRAM(Memristor):
         Fitting parameter realted with R_set(V). (R_set = C/I_comp.)
     I_comp : float
         Compliance current.(A)
-    kT = 0.025
+    kT = 0.025 (eV)
     r, h, T,R are variable.
     flag is flag.
     """
@@ -74,7 +74,7 @@ class CBRAM(Memristor):
         A = 1330,
         R_th = 10e5,
         beta = 0.3,
-        alpha = 0.5,
+        alpha = 2.4,
         C = 0.08,
         I_comp = 0.001,
         **kwargs
@@ -96,13 +96,17 @@ class CBRAM(Memristor):
         self.alpha = args.alpha
         self.C = args.C
         self.I_comp = args.I_comp
+        ## take care of r_on and r_off
+        self.r_on = 0
+        self.r_off = 0
         self.g = 0
+        #
         self.kT = 0.025
         self.q = 1.602e-19
         self.h = 0
         self.r = 0
-        self.T = 300
-        self.R = np.sqrt(args.A/np.pi)
+        self.T = 0
+        self.R = np.sqrt(args.A*10e-18/np.pi)
         self.flag = True
         self.istouched = False
 
@@ -120,9 +124,9 @@ class CBRAM(Memristor):
         float
             The derivative of the vertical expansion.
         """
-        return self.v_h*np.exp(-self.E_a/self.kT)*np.sinh(self.alpha*voltage/(self.kT))
+        return self.v_h*(0.1)*np.exp(-self.E_a/self.kT)*np.sinh(self.alpha*voltage/(self.kT))
 
-    def drdt(self, voltage, R_on):
+    def drdt(self, voltage):
         """
         Method to determine the derivative of the lateral expansion.
 
@@ -136,16 +140,22 @@ class CBRAM(Memristor):
         float
             The derivative of the lateral expansion.
         """
-        self.T = self.kT + (voltage^2*(self.R_th/R_on))/(1.602e-19)
-        return self.v_r*np.exp(-self.E_a/(self.T*self.kT/300))*np.sinh(self.beta*voltage/(self.T*self.kT/300))
-    
+        self.T = 290 + (voltage*voltage*(self.R_th/self.r_on))
+        self.T = (1.38*10e-23)*self.T/(1.602*10e-19)
+        return self.v_r*np.exp(-self.E_a/(self.T))*np.sinh(self.beta*voltage/(self.T))
+
+
     def current(self, voltage):
-        if(~self.istouched):
-            R_off = (self.rho_on*self.h+self.rho_off*(self.L-self.h))/self.A
+        if(not self.istouched):
+            R_off = (self.rho_on*(0.1)*self.h+self.rho_off*(0.1)*(self.L-self.h))/(self.A*10e-18)
+            self.r_off = R_off
             return voltage/R_off
+        
         else:
-            R_on = (self.rho_on*self.L)/(np.pi*self.r*self.R)
-        return voltage/R_on
+            R_on = (self.rho_on*(0.1)*self.L)/(np.pi*self.r*self.R)
+            self.r_on = R_on
+            return voltage/R_on
+
 
 
 ####
@@ -162,28 +172,28 @@ class CBRAM(Memristor):
         np.seterr(all="raise")
         for t in range(0, len_voltage_signal):
             if(np.max(voltage_signal) == voltage_signal[t] or np.min(voltage_signal) == voltage_signal[t]):
-                self.flag = ~self.flag
+                self.flag = not self.flag
 
             if (self.flag):
-                if(~self.istouched):
+                if(not self.istouched):
                     self.h = self.h + (self.dhdt(voltage_signal[t])*self.time_series_resolution)
                     if (self.h>=self.L):
                         self.h = self.L
                         self.istouched = True
-                        self.r = (self.rho_on*self.L)/(np.pi*self.R*(self.C/self.I_comp)) # self.r initialization
+                        self.r = (self.rho_on*(0.1)*self.L)/(np.pi*self.R*(self.C/self.I_comp)) # self.r initialization
                 else:
                     self.r = self.r + (self.drdt(voltage_signal[t])*self.time_series_resolution)
                     self.R = self.R + (self.drdt(voltage_signal[t])*self.time_series_resolution)
 
             else:
                 if(self.istouched):
-                    self.r = self.r - (self.drdt(voltage_signal[t])*self.time_series_resolution)
-                    self.R = self.R - (self.drdt(voltage_signal[t])*self.time_series_resolution)
+                    self.r = self.r + (self.drdt(voltage_signal[t])*self.time_series_resolution)
+                    self.R = self.R + (self.drdt(voltage_signal[t])*self.time_series_resolution)
                     if(self.r<=0):
                         self.r = 0
                         self.istouched = False
                 else:
-                    self.h = self.h -(self.dhdt(voltage_signal[t])*self.time_series_resolution)
+                    self.h = self.h + (self.dhdt(voltage_signal[t])*self.time_series_resolution)
                     if(self.h<=0):
                         self.h = 0
 
