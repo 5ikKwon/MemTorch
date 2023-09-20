@@ -1,12 +1,10 @@
 import math
-
 import numpy as np
 import torch
-
 import memtorch
 from memtorch.utils import clip, convert_range
-
 from .Memristor import Memristor as Memristor
+import logging
 
 class CBRAM(Memristor):
     """CBRAM memristor model (DOI: 10.1109/TED.2011.2116120).
@@ -97,7 +95,9 @@ class CBRAM(Memristor):
         self.C = args.C
         self.I_comp = args.I_comp
         ## take care of r_on and r_off
-        self.r_on = 0
+        ## problems : initial r is too big ! read paper again.
+        ## problems : dT mingle with r_on ! think about that. 
+        self.r_on = args.C/args.I_comp # initial r_on. Look at the eq!
         self.r_off = 0
         self.g = 0
         #
@@ -203,7 +203,7 @@ class CBRAM(Memristor):
 
             if return_current:
                 current[t] = current_
-
+            logging.info('%d of total %d flag : %r | istouched : %r | dh : %.2E | dr : %.2E | dR : %.2E', t, len_voltage_signal, self.flag, self.istouched, self.h, self.r, self.R )
         if return_current:
             return current    
 ####
